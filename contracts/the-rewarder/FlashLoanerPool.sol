@@ -30,7 +30,7 @@ contract FlashLoanerPool is ReentrancyGuard {
         if (amount > balanceBefore) {
             revert NotEnoughTokenBalance();
         }
-
+        //@audit-issue below method can be tricked if called from constructor.
         if (!msg.sender.isContract()) {
             revert CallerIsNotContract();
         }

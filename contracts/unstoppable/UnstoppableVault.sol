@@ -93,11 +93,15 @@ contract UnstoppableVault is IERC3156FlashLender, ReentrancyGuard, Owned, ERC462
         if (amount == 0) revert InvalidAmount(0); // fail early
         if (address(asset) != _token) revert UnsupportedCurrency(); // enforce ERC3156 requirement
         uint256 balanceBefore = totalAssets();
+        /*@audit-info By meeting the below condition we check that the total shares of tokens should be equal to
+        the assets held by the contract(vault) maybe to ensure that each token is backed by a corresponding share in the contract
+        to keep track of inflation/deflation.*/
         if (convertToShares(totalSupply) != balanceBefore) revert InvalidBalance(); // enforce ERC4626 requirement
         uint256 fee = flashFee(_token, amount);
         // transfer tokens out + execute callback on receiver
         ERC20(_token).safeTransfer(address(receiver), amount);
         // callback must return magic value, otherwise assume it failed
+        //@audit-info parameters of onFlashloan should not modify anything. But here address(asset) is passed instead of token address 
         if (receiver.onFlashLoan(msg.sender, address(asset), amount, fee, data) != keccak256("IERC3156FlashBorrower.onFlashLoan"))
             revert CallbackFailed();
         // pull amount + fee from receiver, then pay the fee to the recipient

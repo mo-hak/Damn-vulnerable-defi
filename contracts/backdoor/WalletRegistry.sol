@@ -19,8 +19,8 @@ contract WalletRegistry is IProxyCreationCallback, Ownable {
     uint256 private constant EXPECTED_THRESHOLD = 1;
     uint256 private constant PAYMENT_AMOUNT = 10 ether;
 
-    address public immutable masterCopy;
-    address public immutable walletFactory;
+    address public immutable masterCopy;//gnosissafe
+    address public immutable walletFactory;//gnosissafeproxyfactory
     IERC20 public immutable token;
 
     mapping(address => bool) public beneficiaries;
